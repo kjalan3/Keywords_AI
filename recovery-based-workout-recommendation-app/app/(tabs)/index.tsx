@@ -1,16 +1,18 @@
-// app/(tabs)/index.tsx (update imports and data loading)
+// app/(tabs)/index.tsx
 import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useRecoveryAnalysis } from '../../features/healthkit/hooks/useRecoveryStats';
 import { useWorkoutStore } from '../../store/workoutStore';
 import { getRelativeTime } from '../../utils/dateHelpers';
 
@@ -18,13 +20,14 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user } = useUser();
   const { workouts, loadWorkouts } = useWorkoutStore();
+  const { recovery, isLoading, refetch } = useRecoveryAnalysis();
   const firstName = user?.firstName || 'there';
 
   useEffect(() => {
     if (user) {
       loadWorkouts(user.id);
     }
-  }, []);
+  }, [user]);
 
   // Calculate stats
   const now = new Date();
@@ -34,9 +37,38 @@ export default function HomeScreen() {
   // Get recent workouts
   const recentWorkouts = workouts.slice(0, 3);
 
-  // Mock recovery data - will be replaced with real health data later
-  const recoveryScore = 78;
-  const currentStreak = 5;
+  // Use AI-generated recovery data or fallback
+  const recoveryScore = recovery?.score ?? 78;
+  
+  // Calculate streak (count consecutive days with workouts)
+  const calculateStreak = () => {
+    if (workouts.length === 0) return 0;
+    
+    let streak = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    for (let i = 0; i < 30; i++) {
+      const checkDate = new Date(today);
+      checkDate.setDate(checkDate.getDate() - i);
+      
+      const hasWorkout = workouts.some(w => {
+        const workoutDate = new Date(w.date);
+        workoutDate.setHours(0, 0, 0, 0);
+        return workoutDate.getTime() === checkDate.getTime();
+      });
+      
+      if (hasWorkout) {
+        streak++;
+      } else if (i > 0) {
+        break;
+      }
+    }
+    
+    return streak;
+  };
+  
+  const currentStreak = calculateStreak();
 
   const getRecoveryColor = (score: number) => {
     if (score >= 80) return ['#4CAF50', '#81C784'] as const;
@@ -61,26 +93,54 @@ export default function HomeScreen() {
       </View>
 
       {/* Recovery Card */}
-      <LinearGradient
-        colors={getRecoveryColor(recoveryScore)}
-        style={styles.recoveryCard}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+      <TouchableOpacity 
+        onPress={refetch} 
+        activeOpacity={0.9}
+        disabled={isLoading}
       >
-        <View style={styles.recoveryHeader}>
-          <Text style={styles.recoveryTitle}>Recovery Status</Text>
-          <Ionicons name="heart" size={24} color="#fff" />
-        </View>
-        <View style={styles.recoveryBody}>
-          <Text style={styles.recoveryScore}>{recoveryScore}%</Text>
-          <Text style={styles.recoveryStatus}>
-            {status.emoji} {status.text}
-          </Text>
-        </View>
-        <Text style={styles.recoverySubtext}>
-          Based on your HRV and sleep data
-        </Text>
-      </LinearGradient>
+        <LinearGradient
+          colors={getRecoveryColor(recoveryScore)}
+          style={styles.recoveryCard}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.recoveryHeader}>
+            <Text style={styles.recoveryTitle}>Recovery Status</Text>
+            {isLoading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Ionicons name="sparkles" size={24} color="#fff" />
+            )}
+          </View>
+          <View style={styles.recoveryBody}>
+            <Text style={styles.recoveryScore}>{recoveryScore}%</Text>
+            <Text style={styles.recoveryStatus}>
+              {status.emoji} {status.text}
+            </Text>
+          </View>
+          {recovery ? (
+            <>
+              <Text style={styles.recoverySubtext}>
+                {recovery.reasoning}
+              </Text>
+              {recovery.recommendations.length > 0 && (
+                <View style={styles.recommendationsContainer}>
+                  <Text style={styles.recommendationsTitle}>💡 AI Recommendations:</Text>
+                  {recovery.recommendations.slice(0, 2).map((rec, index) => (
+                    <Text key={index} style={styles.recommendationText}>
+                      • {rec}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </>
+          ) : (
+            <Text style={styles.recoverySubtext}>
+              Tap to analyze your recovery status
+            </Text>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
 
       {/* Stats Row */}
       <View style={styles.statsRow}>
@@ -157,7 +217,6 @@ export default function HomeScreen() {
   );
 }
 
-// ... keep all the existing styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -214,6 +273,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#fff',
     opacity: 0.8,
+  },
+  recommendationsContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  recommendationsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 6,
+  },
+  recommendationText: {
+    fontSize: 13,
+    color: '#fff',
+    opacity: 0.9,
+    marginBottom: 4,
+    lineHeight: 18,
   },
   statsRow: {
     flexDirection: 'row',
