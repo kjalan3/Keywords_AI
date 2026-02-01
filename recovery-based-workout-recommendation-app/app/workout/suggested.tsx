@@ -41,24 +41,26 @@ type FocusArea =
   | 'Upper Body' 
   | 'Lower Body'
   | 'Arms' 
+  | 'Chest' 
   | 'Back' 
   | 'Core'
-  | 'Chest'
   | 'Shoulders';
 
-const FOCUS_AREAS: { label: FocusArea; icon: string }[] = [
-  { label: 'Full Body', icon: '💪' },
-  { label: 'Push', icon: '👊' },
-  { label: 'Pull', icon: '🎣' },
-  { label: 'Legs', icon: '🦵' },
-  { label: 'Upper Body', icon: '💪' },
-  { label: 'Lower Body', icon: '🏋️' },
-  { label: 'Arms', icon: '💪' },
-  { label: 'Chest', icon: '🫁' },
-  { label: 'Back', icon: '🔙' },
-  { label: 'Shoulders', icon: '🤷' },
-  { label: 'Core', icon: '🎯' },
+const FOCUS_AREAS: { label: FocusArea }[] = [
+  { label: 'Full Body' },
+  { label: 'Push' },
+  { label: 'Pull' },
+  { label: 'Legs' },
+  { label: 'Upper Body' },
+  { label: 'Lower Body' },
+  { label: 'Arms' },
+  { label: 'Chest' },
+  { label: 'Back' },
+  { label: 'Shoulders' },
+  { label: 'Core' },
 ];
+
+const EXERCISE_COUNTS = [3, 4, 5, 6, 7];
 
 export default function SuggestedWorkoutScreen() {
   const router = useRouter();
@@ -67,6 +69,7 @@ export default function SuggestedWorkoutScreen() {
   const { startWorkout, addExercise, addSet } = useWorkoutStore();
   
   const [selectedFocusArea, setSelectedFocusArea] = useState<FocusArea>('Full Body');
+  const [selectedExerciseCount, setSelectedExerciseCount] = useState<number>(5);
   const [loading, setLoading] = useState(true);
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,12 +81,12 @@ export default function SuggestedWorkoutScreen() {
     }
   }, [recovery, recoveryLoading]);
 
-  // Regenerate workout when focus area changes
+  // Regenerate workout when focus area or exercise count changes
   useEffect(() => {
     if (recovery && !recoveryLoading && workoutPlan) {
       generateWorkout();
     }
-  }, [selectedFocusArea]);
+  }, [selectedFocusArea, selectedExerciseCount]);
 
   const generateWorkout = async () => {
     if (!recovery) {
@@ -96,12 +99,13 @@ export default function SuggestedWorkoutScreen() {
     setError(null);
 
     try {
-      console.log(`Generating ${selectedFocusArea} workout for recovery:`, recovery);
+      console.log(`Generating ${selectedFocusArea} workout with ${selectedExerciseCount} exercises`);
 
       const plan = await keywordsAI.generateWorkoutPlan(recovery, {
         duration: 45,
         equipment: ['Dumbbells', 'Barbell', 'Bodyweight', 'Cables'],
         focusArea: selectedFocusArea,
+        exerciseCount: selectedExerciseCount,
       });
 
       console.log('Generated workout plan:', plan);
@@ -111,30 +115,19 @@ export default function SuggestedWorkoutScreen() {
       setError(err?.message || 'Failed to generate workout');
 
       // Fallback to mock workout
+      const mockExercises = Array.from({ length: selectedExerciseCount }, (_, i) => ({
+        name: `Exercise ${i + 1}`,
+        sets: i === 0 ? 4 : 3,
+        reps: i === 0 ? '6-8' : '10-12',
+        notes: i === 0 ? 'Focus on form' : undefined,
+      }));
+
       setWorkoutPlan({
         name: `${selectedFocusArea} Power`,
         type: 'Strength Training',
         duration: 45,
         reasoning: `Based on your ${recovery.status} recovery, this ${selectedFocusArea.toLowerCase()} workout will help build strength without overtraining.`,
-        exercises: [
-          {
-            name: 'Compound Movement',
-            sets: 4,
-            reps: '8-10',
-            notes: 'Focus on controlled tempo',
-          },
-          {
-            name: 'Secondary Exercise',
-            sets: 3,
-            reps: '10-12',
-            notes: 'Keep proper form',
-          },
-          {
-            name: 'Accessory Work',
-            sets: 3,
-            reps: '12-15',
-          },
-        ],
+        exercises: mockExercises,
       });
     } finally {
       setLoading(false);
@@ -145,7 +138,9 @@ export default function SuggestedWorkoutScreen() {
     setSelectedFocusArea(area);
   };
 
-  // ... existing startSuggestedWorkout function (keep as is) ...
+  const handleExerciseCountChange = (count: number) => {
+    setSelectedExerciseCount(count);
+  };
 
   const startSuggestedWorkout = () => {
     if (!workoutPlan) {
@@ -239,8 +234,6 @@ export default function SuggestedWorkoutScreen() {
     }
   };
 
-  // ... existing helper functions (getIntensityColor, getIntensityLabel, estimateVolume) ...
-
   const getIntensityColor = (): readonly [string, string] => {
     if (!recovery) return ['#007AFF', '#4DA3FF'];
     switch (recovery.workoutIntensity) {
@@ -300,8 +293,6 @@ export default function SuggestedWorkoutScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="chevron-back" size={24} color="#007AFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>AI Workout</Text>
-          <View style={{ width: 40 }} />
         </View>
 
         {/* Focus Area Selector */}
@@ -322,7 +313,6 @@ export default function SuggestedWorkoutScreen() {
                 onPress={() => handleFocusAreaChange(area.label)}
                 disabled={loading}
               >
-                <Text style={styles.focusChipEmoji}>{area.icon}</Text>
                 <Text
                   style={[
                     styles.focusChipText,
@@ -334,6 +324,33 @@ export default function SuggestedWorkoutScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+        </View>
+
+        {/* Exercise Count Selector */}
+        <View style={styles.exerciseCountSection}>
+          <Text style={styles.exerciseCountLabel}>Number of Exercises</Text>
+          <View style={styles.exerciseCountContainer}>
+            {EXERCISE_COUNTS.map((count) => (
+              <TouchableOpacity
+                key={count}
+                style={[
+                  styles.countButton,
+                  selectedExerciseCount === count && styles.countButtonActive,
+                ]}
+                onPress={() => handleExerciseCountChange(count)}
+                disabled={loading}
+              >
+                <Text
+                  style={[
+                    styles.countButtonText,
+                    selectedExerciseCount === count && styles.countButtonTextActive,
+                  ]}
+                >
+                  {count}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Workout Title */}
@@ -537,16 +554,49 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     borderColor: '#007AFF',
   },
-  focusChipEmoji: {
-    fontSize: 16,
-    marginRight: 6,
-  },
   focusChipText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1C1C1E',
   },
   focusChipTextActive: {
+    color: '#fff',
+  },
+  exerciseCountSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  exerciseCountLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  exerciseCountContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  countButton: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  countButtonActive: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  countButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1C1C1E',
+  },
+  countButtonTextActive: {
     color: '#fff',
   },
   titleSection: {

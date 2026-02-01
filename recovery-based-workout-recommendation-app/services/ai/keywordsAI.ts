@@ -115,9 +115,11 @@ Provide your response in the following JSON format:
       focusArea?: string;
       duration?: number;
       equipment?: string[];
+      exerciseCount?: number;
     },
   ): Promise<WorkoutRecommendation> {
     const duration = userPreferences.duration || 45;
+    const targetExercises = userPreferences.exerciseCount || 5;
 
     // Calculate realistic exercise count based on duration
     const maxExercises = Math.floor(duration / 8); // ~8 min per exercise
@@ -191,6 +193,7 @@ NOW CREATE A UNIQUE WORKOUT BASED ON THE DATA PROVIDED:`;
 
 CRITICAL CONSTRAINTS:
 - MUST create ${minExercises}-${maxExercises} exercises ONLY (not more!)
+- MUST create EXACTLY ${targetExercises} exercises (no more, no less!)
 - Each exercise takes ~8-10 minutes including rest
 - Total workout: ${duration} minutes
 - Recovery Score: ${recoveryData.score}/100 (${recoveryData.status})
