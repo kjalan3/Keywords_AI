@@ -1,10 +1,12 @@
 // app/workout/suggested.tsx
+import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +15,8 @@ import {
 } from 'react-native';
 import { useRecoveryAnalysis } from '../../features/healthkit/hooks/useRecoveryStats';
 import { keywordsAI } from '../../services/ai/keywordsAI';
+import { useWorkoutStore } from '../../store/workoutStore';
+import type { Exercise, WorkoutSet } from '../../types/workout';
 
 type WorkoutExercise = {
   name: string;
@@ -29,18 +33,57 @@ type WorkoutPlan = {
   reasoning: string;
 };
 
+type FocusArea = 
+  | 'Full Body' 
+  | 'Push' 
+  | 'Pull' 
+  | 'Legs' 
+  | 'Upper Body' 
+  | 'Lower Body'
+  | 'Arms' 
+  | 'Back' 
+  | 'Core'
+  | 'Chest'
+  | 'Shoulders';
+
+const FOCUS_AREAS: { label: FocusArea; icon: string }[] = [
+  { label: 'Full Body', icon: '💪' },
+  { label: 'Push', icon: '👊' },
+  { label: 'Pull', icon: '🎣' },
+  { label: 'Legs', icon: '🦵' },
+  { label: 'Upper Body', icon: '💪' },
+  { label: 'Lower Body', icon: '🏋️' },
+  { label: 'Arms', icon: '💪' },
+  { label: 'Chest', icon: '🫁' },
+  { label: 'Back', icon: '🔙' },
+  { label: 'Shoulders', icon: '🤷' },
+  { label: 'Core', icon: '🎯' },
+];
+
 export default function SuggestedWorkoutScreen() {
   const router = useRouter();
+  const { user } = useUser();
   const { recovery, isLoading: recoveryLoading } = useRecoveryAnalysis();
+  const { startWorkout, addExercise, addSet } = useWorkoutStore();
+  
+  const [selectedFocusArea, setSelectedFocusArea] = useState<FocusArea>('Full Body');
   const [loading, setLoading] = useState(true);
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Generate workout on initial load
   useEffect(() => {
     if (recovery && !recoveryLoading) {
       generateWorkout();
     }
   }, [recovery, recoveryLoading]);
+
+  // Regenerate workout when focus area changes
+  useEffect(() => {
+    if (recovery && !recoveryLoading && workoutPlan) {
+      generateWorkout();
+    }
+  }, [selectedFocusArea]);
 
   const generateWorkout = async () => {
     if (!recovery) {
@@ -53,12 +96,12 @@ export default function SuggestedWorkoutScreen() {
     setError(null);
 
     try {
-      console.log('Generating workout plan for recovery:', recovery);
-      
+      console.log(`Generating ${selectedFocusArea} workout for recovery:`, recovery);
+
       const plan = await keywordsAI.generateWorkoutPlan(recovery, {
         duration: 45,
         equipment: ['Dumbbells', 'Barbell', 'Bodyweight', 'Cables'],
-        focusArea: 'Full Body',
+        focusArea: selectedFocusArea,
       });
 
       console.log('Generated workout plan:', plan);
@@ -66,38 +109,28 @@ export default function SuggestedWorkoutScreen() {
     } catch (err: any) {
       console.error('Error generating workout:', err);
       setError(err?.message || 'Failed to generate workout');
-      
+
       // Fallback to mock workout
       setWorkoutPlan({
-        name: 'Balanced Push Day',
+        name: `${selectedFocusArea} Power`,
         type: 'Strength Training',
         duration: 45,
-        reasoning: 'Based on your moderate recovery, this balanced workout will help build strength without overtraining.',
+        reasoning: `Based on your ${recovery.status} recovery, this ${selectedFocusArea.toLowerCase()} workout will help build strength without overtraining.`,
         exercises: [
           {
-            name: 'Bench Press',
+            name: 'Compound Movement',
             sets: 4,
             reps: '8-10',
             notes: 'Focus on controlled tempo',
           },
           {
-            name: 'Incline Dumbbell Press',
+            name: 'Secondary Exercise',
             sets: 3,
             reps: '10-12',
-            notes: 'Keep shoulders retracted',
+            notes: 'Keep proper form',
           },
           {
-            name: 'Overhead Press',
-            sets: 3,
-            reps: '8-10',
-          },
-          {
-            name: 'Lateral Raises',
-            sets: 3,
-            reps: '12-15',
-          },
-          {
-            name: 'Tricep Pushdowns',
+            name: 'Accessory Work',
             sets: 3,
             reps: '12-15',
           },
@@ -108,24 +141,112 @@ export default function SuggestedWorkoutScreen() {
     }
   };
 
-  const startSuggestedWorkout = () => {
-    if (!workoutPlan) return;
-    
-    // TODO: Create workout from plan and navigate to active workout
-    const workoutId = Date.now().toString();
-    router.replace(`/workout/${workoutId}`);
+  const handleFocusAreaChange = (area: FocusArea) => {
+    setSelectedFocusArea(area);
   };
+
+  // ... existing startSuggestedWorkout function (keep as is) ...
+
+  const startSuggestedWorkout = () => {
+    if (!workoutPlan) {
+      Alert.alert('Error', 'No workout plan available');
+      return;
+    }
+
+    if (!user) {
+      Alert.alert('Error', 'Please sign in to start a workout');
+      return;
+    }
+
+    try {
+      console.log('Starting AI workout:', workoutPlan.name);
+      startWorkout(workoutPlan.name, user.id);
+
+      workoutPlan.exercises.forEach((exercise, exerciseIndex) => {
+        const exerciseId = `ex-${Date.now()}-${exerciseIndex}`;
+
+        const parseReps = (repsString: string): number => {
+          const match = repsString.match(/\d+/);
+          return match ? parseInt(match[0]) : 10;
+        };
+
+        const targetReps = parseReps(exercise.reps);
+
+        const inferMuscleGroup = (exerciseName: string): string => {
+          const name = exerciseName.toLowerCase();
+          if (name.includes('bench') || name.includes('chest') || name.includes('press')) return 'Chest';
+          if (name.includes('squat') || name.includes('leg')) return 'Legs';
+          if (name.includes('deadlift') || name.includes('back') || name.includes('row')) return 'Back';
+          if (name.includes('shoulder') || name.includes('overhead') || name.includes('lateral')) return 'Shoulders';
+          if (name.includes('bicep') || name.includes('curl')) return 'Biceps';
+          if (name.includes('tricep') || name.includes('pushdown')) return 'Triceps';
+          if (name.includes('core') || name.includes('plank') || name.includes('crunch')) return 'Core';
+          return 'Full Body';
+        };
+
+        const inferEquipment = (exerciseName: string): string => {
+          const name = exerciseName.toLowerCase();
+          if (name.includes('dumbbell')) return 'Dumbbells';
+          if (name.includes('barbell')) return 'Barbell';
+          if (name.includes('cable')) return 'Cables';
+          if (name.includes('machine')) return 'Machine';
+          if (name.includes('bodyweight') || name.includes('push-up') || name.includes('pull-up')) return 'Bodyweight';
+          return 'Free Weights';
+        };
+
+        const newExercise: Exercise = {
+          id: exerciseId,
+          name: exercise.name,
+          muscleGroup: inferMuscleGroup(exercise.name),
+          equipment: inferEquipment(exercise.name),
+          sets: [],
+          notes: exercise.notes || '',
+        };
+
+        addExercise(newExercise);
+
+        for (let i = 0; i < exercise.sets; i++) {
+          const setId = `${exerciseId}-set-${i + 1}`;
+          const isWarmup = i === 0 && exercise.sets > 2;
+
+          const calculateRestTime = (setNumber: number, totalSets: number): number => {
+            if (isWarmup) return 60;
+            if (setNumber === totalSets) return 0;
+            return 90;
+          };
+
+          const workoutSet: WorkoutSet = {
+            id: setId,
+            setNumber: i + 1,
+            type: isWarmup ? 'warmup' : 'normal',
+            reps: targetReps,
+            weight: undefined,
+            completed: false,
+            restTime: calculateRestTime(i + 1, exercise.sets),
+            notes: isWarmup ? 'Warmup set - use lighter weight' : undefined,
+          };
+
+          addSet(exerciseId, workoutSet);
+        }
+      });
+
+      console.log('✅ Workout created successfully');
+      router.push('/workout/active');
+
+    } catch (error: any) {
+      console.error('Error starting workout:', error);
+      Alert.alert('Error Starting Workout', error?.message || 'Failed to create workout. Please try again.');
+    }
+  };
+
+  // ... existing helper functions (getIntensityColor, getIntensityLabel, estimateVolume) ...
 
   const getIntensityColor = (): readonly [string, string] => {
     if (!recovery) return ['#007AFF', '#4DA3FF'];
-    
     switch (recovery.workoutIntensity) {
-      case 'light':
-        return ['#4CAF50', '#81C784'];
-      case 'high':
-        return ['#FF6B35', '#FF8C61'];
-      default:
-        return ['#007AFF', '#4DA3FF'];
+      case 'light': return ['#4CAF50', '#81C784'];
+      case 'high': return ['#FF6B35', '#FF8C61'];
+      default: return ['#007AFF', '#4DA3FF'];
     }
   };
 
@@ -136,12 +257,10 @@ export default function SuggestedWorkoutScreen() {
 
   const estimateVolume = () => {
     if (!workoutPlan) return '0k lbs';
-    
     const totalSets = workoutPlan.exercises.reduce((sum, ex) => sum + ex.sets, 0);
-    const avgWeight = 150; // Average weight per set
-    const avgReps = 10; // Average reps per set
+    const avgWeight = 150;
+    const avgReps = 10;
     const volume = (totalSets * avgWeight * avgReps) / 1000;
-    
     return `~${volume.toFixed(1)}k lbs`;
   };
 
@@ -185,6 +304,38 @@ export default function SuggestedWorkoutScreen() {
           <View style={{ width: 40 }} />
         </View>
 
+        {/* Focus Area Selector */}
+        <View style={styles.focusAreaSection}>
+          <Text style={styles.focusAreaLabel}>Focus Area</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.focusAreaScroll}
+          >
+            {FOCUS_AREAS.map((area) => (
+              <TouchableOpacity
+                key={area.label}
+                style={[
+                  styles.focusChip,
+                  selectedFocusArea === area.label && styles.focusChipActive,
+                ]}
+                onPress={() => handleFocusAreaChange(area.label)}
+                disabled={loading}
+              >
+                <Text style={styles.focusChipEmoji}>{area.icon}</Text>
+                <Text
+                  style={[
+                    styles.focusChipText,
+                    selectedFocusArea === area.label && styles.focusChipTextActive,
+                  ]}
+                >
+                  {area.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
         {/* Workout Title */}
         <View style={styles.titleSection}>
           <Text style={styles.workoutName}>{workoutPlan.name}</Text>
@@ -205,7 +356,7 @@ export default function SuggestedWorkoutScreen() {
             </Text>
           </View>
           <Text style={styles.insightText}>{workoutPlan.reasoning}</Text>
-          
+
           {recovery && recovery.recommendations.length > 0 && (
             <View style={styles.tipsContainer}>
               <Text style={styles.tipsTitle}>💡 Quick Tips:</Text>
@@ -354,6 +505,49 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: '#1C1C1E',
+  },
+  focusAreaSection: {
+    paddingVertical: 16,
+  },
+  focusAreaLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  focusAreaScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  focusChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginHorizontal: 4,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  focusChipActive: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  focusChipEmoji: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  focusChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
+  },
+  focusChipTextActive: {
+    color: '#fff',
   },
   titleSection: {
     paddingHorizontal: 20,
