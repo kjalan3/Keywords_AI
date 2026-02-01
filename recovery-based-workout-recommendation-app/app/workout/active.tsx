@@ -50,9 +50,47 @@ export default function ActiveWorkoutScreen() {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Finish',
-        onPress: () => {
-          endWorkout();
-          router.replace('/workout/summary');
+        onPress: async () => {
+          if (!activeWorkout) return;
+
+          // Calculate summary data BEFORE calling endWorkout
+          const endTime = new Date().toISOString();
+          const duration = Math.floor(
+            (new Date(endTime).getTime() - new Date(activeWorkout.startTime).getTime()) / 1000
+          );
+
+          // Fixed totalVolume calculation - added initial value of 0
+          const totalVolume = activeWorkout.exercises.reduce((total, ex) => {
+            const exerciseVolume = ex.sets.reduce((setTotal, set) => {
+              return setTotal + (set.weight || 0) * (set.reps || 0);
+            }, 0);
+            return total + exerciseVolume;
+          }, 0); // <-- This was missing!
+
+          const totalSets = activeWorkout.exercises.reduce((t, ex) => t + ex.sets.length, 0);
+
+          const summaryData = {
+            name: activeWorkout.name,
+            duration,
+            date: activeWorkout.date,
+            exercises: activeWorkout.exercises.map(ex => ({
+              name: ex.name,
+              sets: ex.sets.length,
+              volume: ex.sets.reduce((v, s) => v + (s.weight || 0) * (s.reps || 0), 0),
+              personalRecord: false, // TODO: Implement PR detection
+            })),
+            totalVolume,
+            totalSets,
+          };
+
+          // Save to Supabase
+          await endWorkout();
+
+          // Navigate to summary
+          router.replace({
+            pathname: '/workout/summary',
+            params: { summary: JSON.stringify(summaryData) }
+          });
         },
       },
     ]);
@@ -208,9 +246,7 @@ export default function ActiveWorkoutScreen() {
   );
 }
 
-// Use the same styles from your [id].tsx file
 const styles = StyleSheet.create({
-  // Copy all styles from your existing [id].tsx
   container: { flex: 1, backgroundColor: '#F2F2F7' },
   header: {
     flexDirection: 'row',

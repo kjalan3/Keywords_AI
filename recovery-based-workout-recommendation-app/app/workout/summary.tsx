@@ -1,8 +1,8 @@
 // app/workout/summary.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useMemo } from 'react';
 import {
   ScrollView,
   Share,
@@ -11,60 +11,40 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { formatDate, formatDuration } from '../../utils/dateHelpers';
 
 export default function WorkoutSummaryScreen() {
+  const params = useLocalSearchParams();
   const router = useRouter();
+  
+  const workoutData = useMemo(() => {
+    if (!params.summary) return null;
+    try {
+      const parsed = JSON.parse(params.summary as string);
+      return {
+        ...parsed,
+        duration: formatDuration(parsed.duration),
+        date: formatDate(parsed.date),
+        personalRecords: parsed.exercises.filter((e: any) => e.personalRecord).length,
+      };
+    } catch (error) {
+      console.error('Failed to parse workout data:', error);
+      return null;
+    }
+  }, [params.summary]);
 
-  // Mock data - replace with actual workout data
-  const workoutData = {
-    name: 'Push Day',
-    duration: '52:14',
-    date: 'Jan 31, 2026',
-    exercises: [
-      {
-        name: 'Bench Press',
-        sets: 4,
-        volume: 5920,
-        personalRecord: true,
-      },
-      {
-        name: 'Incline Dumbbell Press',
-        sets: 3,
-        volume: 3600,
-      },
-      {
-        name: 'Overhead Press',
-        sets: 3,
-        volume: 2850,
-      },
-      {
-        name: 'Lateral Raises',
-        sets: 3,
-        volume: 1200,
-      },
-      {
-        name: 'Tricep Pushdowns',
-        sets: 3,
-        volume: 1500,
-      },
-    ],
-    totalVolume: 15070,
-    totalSets: 16,
-    personalRecords: 1,
-  };
+  useEffect(() => {
+    if (!workoutData) {
+      router.replace('/(tabs)');
+    }
+  }, [workoutData]);
 
-  React.useEffect(() => {
-    // Trigger confetti animation
-    const confettiRef = React.createRef<any>();
-    setTimeout(() => {
-      confettiRef.current?.startConfetti();
-    }, 300);
-  }, []);
+  if (!workoutData) return null;
 
   const shareWorkout = async () => {
     try {
       await Share.share({
-        message: `Just crushed a ${workoutData.name}! 💪\n\n🏋️ ${workoutData.exercises.length} exercises\n⏱️ ${workoutData.duration}\n📊 ${(workoutData.totalVolume / 1000).toFixed(1)}k lbs total volume\n${workoutData.personalRecords > 0 ? `🏆 ${workoutData.personalRecords} PR${workoutData.personalRecords > 1 ? 's' : ''}!` : ''}\n\n#Recovery-Based-Workout-Recommendation #WorkoutComplete`,
+        message: `Just crushed a ${workoutData.name}! 💪\n\n🏋️ ${workoutData.exercises.length} exercises\n⏱️ ${workoutData.duration}\n📊 ${(workoutData.totalVolume / 1000).toFixed(1)}k lbs total volume\n${workoutData.personalRecords > 0 ? `🏆 ${workoutData.personalRecords} PR${workoutData.personalRecords > 1 ? 's' : ''}!` : ''}\n\n#FitnessApp #WorkoutComplete`,
       });
     } catch (error) {
       console.error(error);
@@ -134,7 +114,7 @@ export default function WorkoutSummaryScreen() {
         {/* Exercise Breakdown */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Exercise Summary</Text>
-          {workoutData.exercises.map((exercise, index) => (
+          {workoutData.exercises.map((exercise: any, index: number) => (
             <View key={index} style={styles.exerciseRow}>
               <View style={styles.exerciseNumber}>
                 <Text style={styles.exerciseNumberText}>{index + 1}</Text>
@@ -165,8 +145,8 @@ export default function WorkoutSummaryScreen() {
               <Text style={styles.aiTitle}>AI Insights</Text>
             </View>
             <Text style={styles.aiText}>
-              Excellent workout! Your volume is up 8% compared to your last push day. 
-              Keep up this intensity. Consider increasing weight on bench press next session.
+              Excellent workout! Keep up this intensity and stay consistent with your
+              training schedule.
             </Text>
           </View>
         </View>
@@ -183,6 +163,8 @@ export default function WorkoutSummaryScreen() {
             </View>
           </View>
         </View>
+
+        <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Action Buttons */}

@@ -9,6 +9,8 @@ export const useActiveWorkout = () => {
     activeWorkout,
     isWorkoutActive,
     workoutStartTime,
+    isLoading,
+    error,
     startWorkout,
     endWorkout,
     addExercise,
@@ -22,14 +24,18 @@ export const useActiveWorkout = () => {
   } = useWorkoutStore();
 
   const createWorkout = (name: string) => {
-    startWorkout(name);
+    if (!user?.id) {
+      console.error("User not authenticated");
+      return;
+    }
+    startWorkout(name, user.id);
   };
 
   const addExerciseToWorkout = (exerciseName: string, exerciseId: string) => {
     const newExercise: Exercise = {
       id: Date.now().toString(),
       name: exerciseName,
-      muscleGroup: "", // Set from exercise database
+      muscleGroup: "",
       sets: [],
       notes: "",
     };
@@ -51,22 +57,17 @@ export const useActiveWorkout = () => {
     addSet(exerciseId, newSet);
   };
 
-  const finishWorkout = () => {
+  const finishWorkout = async () => {
     if (!activeWorkout || !user) return;
-
-    // Update workout with user ID
-    const updatedWorkout = {
-      ...activeWorkout,
-      userId: user.id,
-    };
-
-    saveWorkout();
+    await saveWorkout();
   };
 
   return {
     activeWorkout,
     isWorkoutActive,
     workoutStartTime,
+    isLoading,
+    error,
     createWorkout,
     endWorkout: finishWorkout,
     addExerciseToWorkout,

@@ -9,7 +9,7 @@ export default function WorkoutLayout() {
         options={{
           title: 'New Workout',
           headerStyle: { backgroundColor: '#fff' },
-          headerTitleStyle: { fontSize: 18, fontWeight: 'bold' },
+          headerTitleStyle: { fontSize: 28, fontWeight: 'bold' },
           presentation: 'modal',
         }}
       />
@@ -18,7 +18,7 @@ export default function WorkoutLayout() {
         options={{
           title: 'AI Suggested Workout',
           headerStyle: { backgroundColor: '#fff' },
-          headerTitleStyle: { fontSize: 18, fontWeight: 'bold' },
+          headerTitleStyle: { fontSize: 28, fontWeight: 'bold' },
           presentation: 'modal',
         }}
       />
@@ -27,7 +27,7 @@ export default function WorkoutLayout() {
         options={{
           title: 'Active Workout',
           headerStyle: { backgroundColor: '#fff' },
-          headerTitleStyle: { fontSize: 18, fontWeight: 'bold' },
+          headerTitleStyle: { fontSize: 28, fontWeight: 'bold' },
           headerBackVisible: false,
         }}
       />
@@ -36,7 +36,7 @@ export default function WorkoutLayout() {
         options={{
           title: 'Select Exercise',
           headerStyle: { backgroundColor: '#fff' },
-          headerTitleStyle: { fontSize: 18, fontWeight: 'bold' },
+          headerTitleStyle: { fontSize: 28, fontWeight: 'bold' },
           presentation: 'modal',
         }}
       />
@@ -45,7 +45,7 @@ export default function WorkoutLayout() {
         options={{
           title: 'Workout Complete',
           headerStyle: { backgroundColor: '#fff' },
-          headerTitleStyle: { fontSize: 18, fontWeight: 'bold' },
+          headerTitleStyle: { fontSize: 28, fontWeight: 'bold' },
           headerBackVisible: false,
           gestureEnabled: false,
         }}

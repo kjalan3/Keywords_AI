@@ -21,7 +21,9 @@ export default function HomeScreen() {
   const firstName = user?.firstName || 'there';
 
   useEffect(() => {
-    loadWorkouts();
+    if (user) {
+      loadWorkouts(user.id);
+    }
   }, []);
 
   // Calculate stats

@@ -52,7 +52,7 @@ export default function SettingsScreen() {
     {
       icon: 'calendar-outline',
       label: 'Workout Plan',
-      onPress: () => router.push('/plan/edit' as any),
+      onPress: () => router.push('/plan'),
     },
   ];
 

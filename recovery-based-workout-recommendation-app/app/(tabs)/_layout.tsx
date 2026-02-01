@@ -1,52 +1,76 @@
-// app/workout/_layout.tsx
-import { Stack } from 'expo-router';
+// app/(tabs)/_layout.tsx
+import { Ionicons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 
-export default function WorkoutLayout() {
+export default function TabLayout() {
   return (
-    <Stack>
-      <Stack.Screen
-        name="new"
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: '#007AFF',
+        tabBarInactiveTintColor: '#8E8E93',
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopWidth: 1,
+          borderTopColor: '#E5E5EA',
+          height: 88,
+          paddingTop: 8,
+          paddingBottom: 34,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
+        headerStyle: {
+          backgroundColor: '#fff',
+          elevation: 0,
+          shadowOpacity: 0,
+        },
+        headerTitleStyle: {
+          fontSize: 28,
+          fontWeight: 'bold',
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="index"
         options={{
-          title: 'New Workout',
-          presentation: 'modal',
+          title: 'Home',
+          headerTitle: 'RBWR',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
+          ),
         }}
       />
-      <Stack.Screen
-        name="active"
+      <Tabs.Screen
+        name="workouts"
         options={{
-          title: 'Active Workout',
-          headerShown: true,
-          headerBackVisible: false,
+          title: 'Workouts',
+          headerTitle: 'My Workouts',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="barbell" size={size} color={color} />
+          ),
         }}
       />
-      <Stack.Screen
-        name="exercise-select"
+      <Tabs.Screen
+        name="progress"
         options={{
-          title: 'Select Exercise',
-          presentation: 'modal',
+          title: 'Progress',
+          headerTitle: 'Progress',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="analytics" size={size} color={color} />
+          ),
         }}
       />
-      <Stack.Screen
-        name="suggested"
+      <Tabs.Screen
+        name="settings"
         options={{
-          title: 'AI Workout',
-          presentation: 'modal',
+          title: 'Settings',
+          headerTitle: 'Settings',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings" size={size} color={color} />
+          ),
         }}
       />
-      <Stack.Screen
-        name="summary"
-        options={{
-          title: 'Workout Summary',
-          headerShown: false,
-          gestureEnabled: false,
-        }}
-      />
-      <Stack.Screen
-        name="[id]"
-        options={{
-          title: 'Workout Details',
-        }}
-      />
-    </Stack>
+    </Tabs>
   );
 }

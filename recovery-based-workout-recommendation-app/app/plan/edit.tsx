@@ -1,7 +1,8 @@
 // app/plan/edit.tsx
+import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -13,104 +14,35 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
-type Exercise = {
-  id: string;
-  name: string;
-  sets: number;
-  reps: string;
-  weight?: string;
-  muscleGroup: string;
-};
-
-type WorkoutDay = {
-  id: string;
-  name: string;
-  exercises: Exercise[];
-};
+import { useTemplateStore } from '../../store/templateStore';
+import type { TemplateExercise } from '../../types/template';
 
 export default function EditPlanScreen() {
   const router = useRouter();
+  const { user } = useUser();
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  
+  const { createTemplate, updateTemplate, getTemplateById } = useTemplateStore();
+  
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const [exercises, setExercises] = useState<TemplateExercise[]>([]);
   const [showExerciseLibrary, setShowExerciseLibrary] = useState(false);
-  const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState(''); // Add search state
 
-  // Mock data - replace with actual state management later
-  const [workoutDays, setWorkoutDays] = useState<WorkoutDay[]>([
-    {
-      id: '1',
-      name: 'Push Day',
-      exercises: [
-        {
-          id: 'e1',
-          name: 'Bench Press',
-          sets: 4,
-          reps: '8-10',
-          weight: '185 lbs',
-          muscleGroup: 'Chest',
-        },
-        {
-          id: 'e2',
-          name: 'Overhead Press',
-          sets: 3,
-          reps: '8-12',
-          weight: '95 lbs',
-          muscleGroup: 'Shoulders',
-        },
-        {
-          id: 'e3',
-          name: 'Tricep Dips',
-          sets: 3,
-          reps: '10-12',
-          muscleGroup: 'Triceps',
-        },
-      ],
-    },
-    {
-      id: '2',
-      name: 'Pull Day',
-      exercises: [
-        {
-          id: 'e4',
-          name: 'Pull-ups',
-          sets: 4,
-          reps: '8-10',
-          muscleGroup: 'Back',
-        },
-        {
-          id: 'e5',
-          name: 'Barbell Rows',
-          sets: 4,
-          reps: '8-10',
-          weight: '155 lbs',
-          muscleGroup: 'Back',
-        },
-      ],
-    },
-    {
-      id: '3',
-      name: 'Leg Day',
-      exercises: [
-        {
-          id: 'e6',
-          name: 'Squats',
-          sets: 4,
-          reps: '8-10',
-          weight: '225 lbs',
-          muscleGroup: 'Legs',
-        },
-        {
-          id: 'e7',
-          name: 'Romanian Deadlift',
-          sets: 3,
-          reps: '10-12',
-          weight: '185 lbs',
-          muscleGroup: 'Legs',
-        },
-      ],
-    },
-  ]);
+  // Load existing template if editing
+  useEffect(() => {
+    if (id) {
+      const template = getTemplateById(id);
+      if (template) {
+        setTemplateName(template.name);
+        setTemplateDescription(template.description || '');
+        setExercises(template.exercises);
+      }
+    }
+  }, [id]);
 
-  // Exercise library - simplified version
+  // Exercise library
   const exerciseLibrary = [
     { id: 'lib1', name: 'Barbell Squat', muscleGroup: 'Legs' },
     { id: 'lib2', name: 'Deadlift', muscleGroup: 'Back' },
@@ -124,37 +56,52 @@ export default function EditPlanScreen() {
     { id: 'lib10', name: 'Face Pulls', muscleGroup: 'Shoulders' },
   ];
 
-  const addWorkoutDay = () => {
-    const newDay: WorkoutDay = {
-      id: Date.now().toString(),
-      name: `Day ${workoutDays.length + 1}`,
-      exercises: [],
+  // Filter exercises based on search query
+  const filteredExercises = exerciseLibrary.filter((exercise) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      exercise.name.toLowerCase().includes(query) ||
+      exercise.muscleGroup.toLowerCase().includes(query)
+    );
+  });
+
+  const saveTemplate = async () => {
+    if (!user?.id) return;
+    
+    if (!templateName.trim()) {
+      Alert.alert('Name Required', 'Please enter a name for your template');
+      return;
+    }
+
+    if (exercises.length === 0) {
+      Alert.alert('Add Exercises', 'Please add at least one exercise');
+      return;
+    }
+
+    const templateData = {
+      userId: user.id,
+      name: templateName,
+      description: templateDescription,
+      exercises,
     };
-    setWorkoutDays([...workoutDays, newDay]);
-  };
 
-  const deleteWorkoutDay = (dayId: string) => {
-    Alert.alert('Delete Workout Day', 'Are you sure you want to delete this day?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          setWorkoutDays(workoutDays.filter((day) => day.id !== dayId));
-        },
-      },
-    ]);
-  };
-
-  const addExerciseToDay = (dayId: string) => {
-    setSelectedDayId(dayId);
-    setShowExerciseLibrary(true);
+    if (id) {
+      // Update existing
+      await updateTemplate(id, templateData);
+      Alert.alert('Success', 'Template updated successfully!');
+    } else {
+      // Create new
+      const newId = await createTemplate(templateData);
+      if (newId) {
+        Alert.alert('Success', 'Template created successfully!');
+      }
+    }
+    
+    router.back();
   };
 
   const selectExercise = (exercise: typeof exerciseLibrary[0]) => {
-    if (!selectedDayId) return;
-
-    const newExercise: Exercise = {
+    const newExercise: TemplateExercise = {
       id: Date.now().toString(),
       name: exercise.name,
       sets: 3,
@@ -162,126 +109,96 @@ export default function EditPlanScreen() {
       muscleGroup: exercise.muscleGroup,
     };
 
-    setWorkoutDays(
-      workoutDays.map((day) =>
-        day.id === selectedDayId
-          ? { ...day, exercises: [...day.exercises, newExercise] }
-          : day
-      )
-    );
-
+    setExercises([...exercises, newExercise]);
     setShowExerciseLibrary(false);
-    setSelectedDayId(null);
+    setSearchQuery(''); // Reset search when closing
   };
 
-  const deleteExercise = (dayId: string, exerciseId: string) => {
-    setWorkoutDays(
-      workoutDays.map((day) =>
-        day.id === dayId
-          ? {
-              ...day,
-              exercises: day.exercises.filter((ex) => ex.id !== exerciseId),
-            }
-          : day
-      )
-    );
+  const deleteExercise = (exerciseId: string) => {
+    setExercises(exercises.filter((ex) => ex.id !== exerciseId));
   };
 
-  const renameDayPrompt = (day: WorkoutDay) => {
-    Alert.prompt(
-      'Rename Workout Day',
-      'Enter a new name for this workout day',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Save',
-          onPress: (newName : any) => {
-            if (newName) {
-              setWorkoutDays(
-                workoutDays.map((d) =>
-                  d.id === day.id ? { ...d, name: newName } : d
-                )
-              );
-            }
-          },
-        },
-      ],
-      'plain-text',
-      day.name
-    );
+  const openExerciseLibrary = () => {
+    setSearchQuery(''); // Reset search when opening
+    setShowExerciseLibrary(true);
+  };
+
+  const closeExerciseLibrary = () => {
+    setShowExerciseLibrary(false);
+    setSearchQuery(''); // Reset search when closing
   };
 
   return (
     <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.cancelText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={saveTemplate}>
+          <Text style={styles.saveText}>Save</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header Info */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Customize Your Plan</Text>
-          <Text style={styles.headerSubtitle}>
-            Add, remove, or reorder workout days and exercises
-          </Text>
+        {/* Template Info */}
+        <View style={styles.infoSection}>
+          <Text style={styles.label}>Workout Name</Text>
+          <TextInput
+            style={styles.nameInput}
+            placeholder="e.g., Push Day, Pull Day, Leg Day"
+            value={templateName}
+            onChangeText={setTemplateName}
+          />
+
+          <Text style={[styles.label, { marginTop: 16 }]}>Description (Optional)</Text>
+          <TextInput
+            style={styles.descriptionInput}
+            placeholder="Add notes about this workout..."
+            value={templateDescription}
+            onChangeText={setTemplateDescription}
+            multiline
+          />
         </View>
 
-        {/* Workout Days */}
-        {workoutDays.map((day, dayIndex) => (
-          <View key={day.id} style={styles.dayCard}>
-            <View style={styles.dayHeader}>
+        {/* Exercises */}
+        <View style={styles.exercisesSection}>
+          <Text style={styles.sectionTitle}>Exercises</Text>
+          
+          {exercises.map((exercise) => (
+            <View key={exercise.id} style={styles.exerciseItem}>
+              <View style={styles.exerciseContent}>
+                <View style={styles.exerciseIconContainer}>
+                  <Ionicons name="barbell-outline" size={20} color="#007AFF" />
+                </View>
+                <View style={styles.exerciseInfo}>
+                  <Text style={styles.exerciseName}>{exercise.name}</Text>
+                  <Text style={styles.exerciseMeta}>
+                    {exercise.sets} sets × {exercise.reps} reps
+                    {exercise.weight ? ` • ${exercise.weight}` : ''}
+                  </Text>
+                </View>
+              </View>
               <TouchableOpacity
-                style={styles.dayTitleContainer}
-                onPress={() => renameDayPrompt(day)}
+                style={styles.deleteExerciseButton}
+                onPress={() => deleteExercise(exercise.id)}
               >
-                <Text style={styles.dayTitle}>{day.name}</Text>
-                <Ionicons name="create-outline" size={18} color="#8E8E93" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => deleteWorkoutDay(day.id)}>
-                <Ionicons name="trash-outline" size={22} color="#FF3B30" />
+                <Ionicons name="close-circle" size={24} color="#FF3B30" />
               </TouchableOpacity>
             </View>
+          ))}
 
-            {/* Exercises */}
-            {day.exercises.map((exercise) => (
-              <View key={exercise.id} style={styles.exerciseItem}>
-                <TouchableOpacity
-                  style={styles.exerciseContent}
-                  onPress={() => router.push(`/plan/exercise/${exercise.id}` as any)}
-                >
-                  <View style={styles.exerciseIconContainer}>
-                    <Ionicons name="barbell-outline" size={20} color="#007AFF" />
-                  </View>
-                  <View style={styles.exerciseInfo}>
-                    <Text style={styles.exerciseName}>{exercise.name}</Text>
-                    <Text style={styles.exerciseMeta}>
-                      {exercise.sets} sets × {exercise.reps} reps
-                      {exercise.weight ? ` • ${exercise.weight}` : ''}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.deleteExerciseButton}
-                  onPress={() => deleteExercise(day.id, exercise.id)}
-                >
-                  <Ionicons name="close-circle" size={24} color="#FF3B30" />
-                </TouchableOpacity>
-              </View>
-            ))}
+          {/* Add Exercise Button */}
+          <TouchableOpacity
+            style={styles.addExerciseButton}
+            onPress={openExerciseLibrary}
+          >
+            <Ionicons name="add-circle-outline" size={20} color="#007AFF" />
+            <Text style={styles.addExerciseText}>Add Exercise</Text>
+          </TouchableOpacity>
+        </View>
 
-            {/* Add Exercise Button */}
-            <TouchableOpacity
-              style={styles.addExerciseButton}
-              onPress={() => addExerciseToDay(day.id)}
-            >
-              <Ionicons name="add-circle-outline" size={20} color="#007AFF" />
-              <Text style={styles.addExerciseText}>Add Exercise</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-
-        {/* Add Day Button */}
-        <TouchableOpacity style={styles.addDayButton} onPress={addWorkoutDay}>
-          <Ionicons name="add" size={24} color="#fff" />
-          <Text style={styles.addDayText}>Add Workout Day</Text>
-        </TouchableOpacity>
+        <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Exercise Library Modal */}
@@ -289,12 +206,12 @@ export default function EditPlanScreen() {
         visible={showExerciseLibrary}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setShowExerciseLibrary(false)}
+        onRequestClose={closeExerciseLibrary}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Exercise Library</Text>
-            <TouchableOpacity onPress={() => setShowExerciseLibrary(false)}>
+            <TouchableOpacity onPress={closeExerciseLibrary}>
               <Ionicons name="close" size={28} color="#1C1C1E" />
             </TouchableOpacity>
           </View>
@@ -303,10 +220,14 @@ export default function EditPlanScreen() {
             style={styles.searchInput}
             placeholder="Search exercises..."
             placeholderTextColor="#8E8E93"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
           />
 
           <FlatList
-            data={exerciseLibrary}
+            data={filteredExercises}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <TouchableOpacity
@@ -324,6 +245,15 @@ export default function EditPlanScreen() {
               </TouchableOpacity>
             )}
             contentContainerStyle={styles.libraryList}
+            ListEmptyComponent={
+              <View style={styles.emptySearch}>
+                <Ionicons name="search-outline" size={48} color="#C7C7CC" />
+                <Text style={styles.emptySearchText}>No exercises found</Text>
+                <Text style={styles.emptySearchSubtext}>
+                  Try a different search term
+                </Text>
+              </View>
+            }
           />
         </View>
       </Modal>
@@ -336,48 +266,64 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F2F2F7',
   },
-  scrollView: {
-    flex: 1,
-  },
-  header: {
-    padding: 20,
-    paddingTop: 12,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    color: '#8E8E93',
-  },
-  dayCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 16,
-    padding: 16,
-  },
-  dayHeader: {
+  topHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
+    borderBottomColor: '#E5E5EA',
   },
-  dayTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  cancelText: {
+    fontSize: 17,
+    color: '#FF3B30',
   },
-  dayTitle: {
+  saveText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  infoSection: {
+    backgroundColor: '#fff',
+    padding: 20,
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8E8E93',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  nameInput: {
+    backgroundColor: '#F2F2F7',
+    padding: 12,
+    borderRadius: 8,
+    fontSize: 17,
+    color: '#1C1C1E',
+  },
+  descriptionInput: {
+    backgroundColor: '#F2F2F7',
+    padding: 12,
+    borderRadius: 8,
+    fontSize: 15,
+    color: '#1C1C1E',
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  exercisesSection: {
+    paddingHorizontal: 20,
+  },
+  sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1C1C1E',
+    marginBottom: 16,
   },
   exerciseItem: {
     flexDirection: 'row',
@@ -388,7 +334,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#fff',
     padding: 12,
     borderRadius: 12,
   },
@@ -396,7 +342,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: '#fff',
+    backgroundColor: '#F2F2F7',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -421,34 +367,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
+    padding: 16,
     borderWidth: 2,
     borderColor: '#007AFF',
     borderRadius: 12,
     borderStyle: 'dashed',
     marginTop: 4,
+    backgroundColor: '#fff',
   },
   addExerciseText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#007AFF',
     marginLeft: 8,
-  },
-  addDayButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#007AFF',
-    marginHorizontal: 20,
-    marginBottom: 32,
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  addDayText: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: '#fff',
   },
   modalContainer: {
     flex: 1,
@@ -510,5 +441,20 @@ const styles = StyleSheet.create({
   libraryMuscle: {
     fontSize: 14,
     color: '#8E8E93',
+  },
+  emptySearch: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptySearchText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#8E8E93',
+    marginTop: 16,
+  },
+  emptySearchSubtext: {
+    fontSize: 14,
+    color: '#C7C7CC',
+    marginTop: 4,
   },
 });

@@ -5,29 +5,18 @@ export default function PlanLayout() {
   return (
     <Stack>
       <Stack.Screen
-        name="edit"
+        name="index"
         options={{
-          title: 'Edit Workout Plan',
-          headerStyle: {
-            backgroundColor: '#fff',
-          },
-          headerTitleStyle: {
-            fontSize: 18,
-            fontWeight: 'bold',
-          },
+          title: 'Workout Templates',
+          headerStyle: { backgroundColor: '#fff' },
+          headerTitleStyle: { fontSize: 28, color: '#1C1C1E', fontWeight: 'bold' },
         }}
       />
       <Stack.Screen
-        name="exercise/[id]"
+        name="edit"
         options={{
-          title: 'Exercise Details',
-          headerStyle: {
-            backgroundColor: '#fff',
-          },
-          headerTitleStyle: {
-            fontSize: 18,
-            fontWeight: 'bold',
-          },
+          title: 'Edit Template',
+          presentation: 'modal',
         }}
       />
     </Stack>
