@@ -290,9 +290,12 @@ export default function SuggestedWorkoutScreen() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={24} color="#007AFF" />
-          </TouchableOpacity>
+          <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
         </View>
 
         {/* Focus Area Selector */}
@@ -460,6 +463,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F2F2F7',
   },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  backText: {
+    fontSize: 17,
+    color: '#FF3B30',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -514,9 +526,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 12,
-  },
-  backButton: {
-    width: 40,
   },
   headerTitle: {
     fontSize: 17,
