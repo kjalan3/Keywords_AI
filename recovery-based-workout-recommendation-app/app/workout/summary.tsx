@@ -64,7 +64,7 @@ export default function WorkoutSummaryScreen() {
   const shareWorkout = async () => {
     try {
       await Share.share({
-        message: `Just crushed a ${workoutData.name}! 💪\n\n🏋️ ${workoutData.exercises.length} exercises\n⏱️ ${workoutData.duration}\n📊 ${(workoutData.totalVolume / 1000).toFixed(1)}k lbs total volume\n${workoutData.personalRecords > 0 ? `🏆 ${workoutData.personalRecords} PR${workoutData.personalRecords > 1 ? 's' : ''}!` : ''}\n\n#FitTrackAI #WorkoutComplete`,
+        message: `Just crushed a ${workoutData.name}! 💪\n\n🏋️ ${workoutData.exercises.length} exercises\n⏱️ ${workoutData.duration}\n📊 ${(workoutData.totalVolume / 1000).toFixed(1)}k lbs total volume\n${workoutData.personalRecords > 0 ? `🏆 ${workoutData.personalRecords} PR${workoutData.personalRecords > 1 ? 's' : ''}!` : ''}\n\n#Recovery-Based-Workout-Recommendation #WorkoutComplete`,
       });
     } catch (error) {
       console.error(error);

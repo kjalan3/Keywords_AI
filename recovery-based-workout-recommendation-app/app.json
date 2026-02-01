@@ -9,7 +9,12 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.recoverybasedworkoutrecommendation",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "We need access to read your heart rate variability and sleep data to provide personalized workout recommendations.",
+        "NSHealthUpdateUsageDescription": "We need access to save your workout data to Apple Health."
+      }
     },
     "android": {
       "adaptiveIcon": {

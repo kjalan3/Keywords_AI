@@ -1,53 +1,75 @@
 // app/_layout.tsx
-import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
+import { ClerkProvider, useAuth, useUser } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Slot, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
 
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
+console.log('Clerk Key:', CLERK_PUBLISHABLE_KEY); // Debug log
+
+if (!CLERK_PUBLISHABLE_KEY) {
+  throw new Error('Missing Clerk Publishable Key');
+}
+
 function InitialLayout() {
   const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
   const segments = useSegments();
   const router = useRouter();
 
-  // Navigate based on auth state
   useEffect(() => {
     if (!isLoaded) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inOnboarding = segments.includes('onboarding');
 
-    if (isSignedIn && inAuthGroup) {
-      router.replace('/(tabs)');
-    } else if (!isSignedIn && !inAuthGroup) {
-      router.replace('/(auth)/sign-in');
+    console.log('Navigation State:', {
+      isSignedIn,
+      inAuthGroup,
+      inOnboarding,
+      segments,
+      onboardingComplete: user?.unsafeMetadata?.onboardingComplete,
+    });
+
+    if (isSignedIn) {
+      // User is signed in
+      const onboardingComplete = user?.unsafeMetadata?.onboardingComplete;
+
+      if (!onboardingComplete) {
+        // Not completed onboarding - send to welcome screen
+        if (!inOnboarding) {
+          console.log('Redirecting to onboarding/welcome');
+          router.replace('/(auth)/onboarding/welcome' as any);
+        }
+      } else {
+        // Onboarding complete - send to main app
+        if (inAuthGroup) {
+          console.log('Redirecting to tabs');
+          router.replace('/(tabs)' as any);
+        }
+      }
+    } else {
+      // User is not signed in
+      if (!inAuthGroup) {
+        console.log('Redirecting to sign-in');
+        router.replace('/(auth)/sign-in' as any);
+      }
     }
-  }, [isLoaded, isSignedIn, segments]);
+  }, [isLoaded, isSignedIn, segments, user?.unsafeMetadata?.onboardingComplete, router]);
 
-  if (!isLoaded) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
-      </View>
+  return <Slot />;
+}
+
+export default function RootLayout() {
+  if (!CLERK_PUBLISHABLE_KEY) {
+    throw new Error(
+      'Missing Clerk Publishable Key. Please add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to your .env file'
     );
   }
 
   return (
-    <Stack>
-      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="workout" options={{ headerShown: false }} />
-    </Stack>
-  );
-}
-
-export default function RootLayout() {
-  return (
-    <ClerkProvider 
-      publishableKey={CLERK_PUBLISHABLE_KEY!} 
-      tokenCache={tokenCache}
-    >
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
       <InitialLayout />
     </ClerkProvider>
   );
