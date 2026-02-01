@@ -75,11 +75,7 @@ export default function NewWorkoutScreen() {
   };
 
   const handleAIGenerate = () => {
-    Alert.alert(
-      'AI Workout',
-      'AI workout generation coming soon!',
-      [{ text: 'OK' }]
-    );
+    router.push('/workout/suggested');
   };
 
   return (
